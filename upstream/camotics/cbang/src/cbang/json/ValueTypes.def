@@ -1,0 +1,52 @@
+/******************************************************************************\
+
+          This file is part of the C! library.  A.K.A the cbang library.
+
+                Copyright (c) 2021-2026, Cauldron Development  Oy
+                Copyright (c) 2003-2021, Cauldron Development LLC
+                               All rights reserved.
+
+         The C! library is free software: you can redistribute it and/or
+        modify it under the terms of the GNU Lesser General Public License
+       as published by the Free Software Foundation, either version 2.1 of
+               the License, or (at your option) any later version.
+
+        The C! library is distributed in the hope that it will be useful,
+          but WITHOUT ANY WARRANTY; without even the implied warranty of
+        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+                 Lesser General Public License for more details.
+
+         You should have received a copy of the GNU Lesser General Public
+                 License along with the C! library.  If not, see
+                         <http://www.gnu.org/licenses/>.
+
+        In addition, BSD licensing may be granted on a case by case basis
+        by written permission from at least one of the copyright holders.
+           You may request written permission by emailing the authors.
+
+                  For information regarding this software email:
+                                 Joseph Coffland
+                          joseph@cauldrondevelopment.com
+
+\******************************************************************************/
+
+//            NAME       TYPE           PARAM SUFFIX
+CBANG_JSON_VT(Dict,      const Value &, 0,    Dict);
+CBANG_JSON_VT(List,      const Value &, 0,    List);
+CBANG_JSON_VT(Undefined, const Value &, 0,    Undefined);
+CBANG_JSON_VT(Null,      const Value &, 0,    Null);
+CBANG_JSON_VT(Boolean,   bool,          1,    Boolean);
+
+CBANG_JSON_VT(Number,    double,        1,    );
+CBANG_JSON_VT(String,    std::string,   1,    );
+
+CBANG_JSON_VT(S8,        int8_t,        1,    );
+CBANG_JSON_VT(U8,        uint8_t,       1,    );
+CBANG_JSON_VT(S16,       int16_t,       1,    );
+CBANG_JSON_VT(U16,       uint16_t,      1,    );
+CBANG_JSON_VT(S32,       int32_t,       1,    );
+CBANG_JSON_VT(U32,       uint32_t,      1,    );
+CBANG_JSON_VT(S64,       int64_t,       1,    );
+CBANG_JSON_VT(U64,       uint64_t,      1,    );
+
+#undef CBANG_JSON_VT

@@ -1,0 +1,15 @@
+Import('*')
+
+env = env.Clone()
+
+if env.get('compiler') == 'clang':
+  env.Append(CCFLAGS = ['-Wno-shift-negative-value',
+                        '-Wno-unknown-warning-option',
+                        '-Wno-deprecated-non-prototype'])
+
+lib = env.Library('#/lib/z', Glob('*.c'))
+
+hdrs = env.Install(dir = '#/include', source = ['zlib.h', 'zconf.h'])
+Depends(lib, hdrs)
+
+Return('lib')

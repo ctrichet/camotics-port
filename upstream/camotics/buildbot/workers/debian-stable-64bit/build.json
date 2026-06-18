@@ -1,0 +1,11 @@
+{
+  "props": {"os": "lin"},
+
+  "env": {
+    "QT5DIR": "/usr"
+  },
+
+  "builds": {
+    "camotics": {"projects": ["camotics"]}
+  }
+}

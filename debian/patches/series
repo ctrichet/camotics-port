@@ -1,0 +1,5 @@
+0001-Use-system-cairo-if-present.patch
+0002-Allow-using-system-GLEW.patch
+0003-Use-system-dxflib-and-move-dxf-to-3rdparty-location.patch
+fix-misleading-indentation.patch
+Use-memcpy-instead-of-strncpy-and-ensure-null-termin.patch

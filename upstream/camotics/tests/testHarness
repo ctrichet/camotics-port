@@ -1,0 +1,1945 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+#
+#  This software is available as Open-Source software under the
+#  terms of the new BSD license as follows:
+#
+#  Copyright (c) 2004-2015 Cauldron Development LLC
+#  All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions
+#  are met:
+#
+#  * Redistributions of source code must retain the above copyright notice,
+#    this list of conditions and the following disclaimer.
+#
+#  * Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+#  * Neither the name of the Cauldron Development LLC nor the names of its
+#    contributors may be used to endorse or promote products derived from
+#    this software without specific prior written permission.
+#
+#   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+#   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+#   TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+#   PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+#   CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+#   EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#   PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+#   PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+#   LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+#   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+#   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+from optparse import OptionParser
+import sys
+import time
+import datetime
+import os
+import glob
+import subprocess
+import difflib
+import shlex
+from types import *
+from tempfile import *
+import shutil
+import re
+import sqlite3
+import copy
+import operator
+import json
+from six import string_types
+
+try:
+  from io import StringIO
+except:
+  from StringIO import StringIO
+
+try:
+  from collections import OrderedDict
+except:
+  def OrderedDict():
+    dict()
+
+# Test result codes
+PASSED = 0
+FAILED = 1
+UNINITIALIZED = 2
+INITIALIZED = 3
+INVALID = 4
+DISABLED = 5
+
+status_names = [
+  'PASSED',
+  'FAILED',
+  'UNINITIALIZED',
+  'INITIALZED',
+  'INVALID',
+  'DISABLED',
+  ]
+
+colors = {
+  'none':          '[00m',
+
+  'initialized':   '[35m',
+  'uninitialized': '[33m',
+  'passed':        '[32m',
+  'failed':        '[31m',
+  'disabled':      '[34m',
+  'invalid':       '[35m',
+
+  'old':           '[31m',
+  'new':           '[36m',
+  }
+
+bgcolors = {
+  'initialized':   '[30;46m',
+  'uninitialized': '[30;43m',
+  'passed':        '[30;42m',
+  'failed':        '[01;37;41m',
+  'disabled':      '[01;37;44m',
+  'invalid':       '[01;37;45m',
+  }
+
+
+def bar():
+  output_stream.write(screen_width * '*' + '\n')
+
+
+def labeled_bar(label):
+  length = len(label) + 2
+  width1 = int((screen_width - length) / 2)
+  width2 = int(screen_width - length - width1)
+
+  str = width1 * '*' + ' ' + label + ' ' + width2 * '*' + '\n'
+
+  output_stream.write(str)
+
+
+def format_line(left, right):
+  left = str(left)
+  right = str(right)
+
+  spaces = screen_width - len(left) - len(right)
+  return "%s%s%s" % (left, ' ' * spaces, right)
+
+
+def get_time_string():
+  utc = datetime.datetime.utcnow()
+  now = datetime.datetime.now()
+  offset = now.hour - utc.hour
+  return now.strftime('%Y-%d-%m %H:%M:%S') + ' UTC%+d' % offset
+
+
+def ensure_parent_dir(file):
+  dir, name = os.path.split(file)
+  if not os.path.exists(dir): os.makedirs(dir)
+
+
+def copy_pattern(pattern, dst, ignores = []):
+  # shutil.ignore_patterns() is only in v2.6
+  ignore = lambda dir, files: list(filter(lambda f: f in ignores, files))
+
+  for path in glob.glob(pattern):
+    dir, file = os.path.split(path)
+    if len(ignore(dir, [file])): continue
+
+    if os.path.isdir(path):
+      shutil.copytree(path, dst + '/' + file, ignore = ignore)
+    elif os.path.exists(path):
+      shutil.copy2(path, dst)
+
+
+def is_readable(obj):
+  return hasattr(obj, 'read') and callable(obj.read)
+
+
+def read_file(path):
+  f = None
+
+  try:
+    f = open(path, 'rt')
+    return f.read()
+
+  finally:
+    if f is not None: f.close()
+
+
+def write_file(path, data):
+  f = None
+
+  try:
+    f = open(path, 'w')
+    f.write(data)
+
+  finally:
+    if f is not None: f.close()
+
+
+def split_cmd_line(cmd):
+  if isinstance(cmd, string_types): return shlex.split(str(cmd))
+  return cmd
+
+
+def quote_cmd(command):
+  try:
+    from shlex import quote
+    return quote(command)
+
+  except:
+    try:
+      from pipes import quote
+      return quote(command)
+
+    except:
+      return ' '.join(command)
+
+
+def execute_proc(command, timeout, **kwargs):
+  try:
+    # Check for .exe, needed in Windows cross compiled environments on Linux
+    command = split_cmd_line(command)
+    if not os.path.isfile(command[0]) and os.path.isfile(command[0] + '.exe'):
+      command[0] += '.exe'
+
+    start = time.time()
+    proc = subprocess.Popen(command, **kwargs)
+
+    # Wait for process to complete
+    while proc.poll() is None:
+      if timeout and timeout < start - time.time():
+        if sys.platform == 'win32': proc.kill()
+        else: os.killpg(proc.pid)
+        raise Exception('Timedout')
+      time.sleep(0.1)
+
+    return proc.returncode
+
+  except Exception as e:
+    raise Exception('Running: ' + ' '.join(command) + '\nCaused by:' + str(e))
+
+
+def remove_tree(path):
+  mode = os.stat(path).st_mode
+
+  if not os.path.islink(path) and os.path.isdir(path):
+    if (mode & 0o0700) != 0o0700: os.chmod(path, mode | 0o0700)
+
+    for name in os.listdir(path):
+      remove_tree(path + '/' + name)
+
+    os.rmdir(path)
+
+  else:
+    if sys.platform == 'win32' and (mode & 0o0200) != 0o0200:
+      os.chmod(path, mode | 0o0200)
+    os.remove(path)
+
+
+class HarnessError(Exception):
+  def __init__(self, msg, show_usage = False):
+    self.msg = msg
+    self.show_usage = show_usage
+
+
+class Logger:
+  def __init__(self):
+    self.stream = output_stream
+    self.depth = 0
+    self.length = 0
+
+    if options.output_json is not None:
+      self.json = OrderedDict()
+      self.stack = list([self.json])
+      self.summary_data = None
+    else: self.json = None
+
+
+  def back(self):
+    return self.stack[len(self.stack) - 1]
+
+
+  def push(self, key):
+    #print('JSON push(%s)' % key)
+    self.back()[key] = OrderedDict()
+    self.stack.append(self.back()[key])
+
+
+  def pop(self, key):
+    #print('JSON pop(%s)' % key)
+    self.stack.pop()
+
+
+  def insert(self, key, value):
+    if self.json is None: return
+    self.back()[key] = value
+
+
+  def start(self):
+    start_time = get_time_string()
+
+    if self.json is not None:
+      self.insert('start', start_time)
+      self.push('suites')
+
+    labeled_bar(start_time)
+    self.stream.write(
+      format_line('Test Name: [reason...]', 'Result') + '\n')
+
+
+  def end(self):
+    if self.json is not None:
+      self.pop('suites')
+      if self.summary_data is not None:
+        self.json['summary'] = self.summary_data
+
+    labeled_bar(get_time_string())
+
+
+  def summary_line(self, name, count):
+    if self.json is not None: self.summary_data[name.lower()] = count
+
+    if count and options.color:
+      self.stream.write(bgcolors[name.lower()])
+    self.stream.write(format_line(name, count))
+    if count and options.color:
+      self.stream.write(colors['none'])
+    self.stream.write('\n')
+
+
+  def summary(self, results):
+    if self.json is not None: self.summary_data = OrderedDict()
+
+    labeled_bar('Summary')
+
+    self.summary_line('Passed', results.passed)
+    self.summary_line('Failed', results.failed)
+    self.summary_line('Uninitialized', results.uninitialized)
+    self.summary_line('Initialized', results.initialized)
+    self.summary_line('Disabled', results.disabled)
+    self.summary_line('Invalid', results.invalid)
+    bar()
+    self.stream.write(
+      format_line('Suites ', results.suites) + '\n' +
+      format_line('Tests ', results.tests) + '\n')
+
+    delta = results.endTime - results.startTime
+    seconds = delta.seconds
+    hours = seconds / (60 * 60)
+    seconds %= 60 * 60
+    minutes = seconds / 60
+    seconds %= 60
+
+    time = '%d:%02d:%02d:%02d.%04d' % (
+      delta.days, hours, minutes, seconds, delta.microseconds)
+    self.stream.write(format_line('Time', time) + '\n')
+
+    if self.json is not None:
+      self.summary_data['suites'] = results.suites
+      self.summary_data['tests'] = results.tests
+      self.summary_data['time'] = time
+
+
+  def start_suite(self, suite):
+    if self.json is not None: self.push(suite.name)
+    labeled_bar('Test Suite: ' + suite.name)
+
+
+  def end_suite(self, suite):
+    if self.json is not None: self.pop(suite.name)
+
+
+  def start_test(self, test):
+    if self.json is not None:
+      self.push(test.name)
+      if hasattr(test, 'units') and test.units is not None:
+        self.push('units')
+
+    if options.verbose:
+      self.stream.write(' '.join(test.get_command()) + '\n')
+
+    if self.depth and self.length: self.stream.write('\n')
+
+    # indent
+    self.stream.write(' ' * self.depth)
+
+    self.stream.write(test.name + ':')
+    self.stream.flush()
+    self.length = len(test.name) + 1 + self.depth
+    self.depth += 1
+
+
+  def end_test(self, test):
+    self.depth -= 1
+
+    if self.json is not None:
+      if hasattr(test, 'units') and test.units is not None:
+        self.pop('units')
+      self.insert('status', status_names[test.status].lower())
+      if test.reason is not None: self.insert('reason', test.reason)
+      self.pop(test.name)
+
+    if self.length == 0: return # Don't print if there were Units
+
+    if test.reason is not None:
+      self.stream.write(' ' + test.reason)
+      self.length += len(test.reason) + 1
+
+    status = status_names[test.status]
+    str = '[%s]' % status.upper()
+    self.length += len(str)
+
+    if options.color:
+      str = colors[status.lower()] + str + colors['none']
+
+    if self.length < screen_width:
+      str = ' ' * (screen_width - self.length) + str
+    self.stream.write(str + '\n')
+    self.length = 0
+
+
+  def start_files(self):
+    if self.json is not None: self.push('files')
+
+
+  def file(self, test, path):
+    if self.json is None: return
+
+    # Read data
+    data = read_file(path)
+    filename = os.path.basename(path)
+    if re.search(r'/expect/[^/]*$', path):
+      filename = 'expect/' + filename
+
+    self.insert(filename, data)
+
+
+  def end_files(self):
+    if self.json is not None: self.pop('files')
+
+
+class Check:
+  def initialize(self, test): pass
+  def reset(self, test): pass
+  def starting(self, test): pass
+  def check(self, test): return PASSED
+  def view(self, test): pass
+  def log(self, test, with_expected = False): pass
+  def diff(self, test): return False
+
+
+class CheckGroup(Check):
+  def __init__(self, checks = []):
+    self.checks = list(checks)
+
+
+  def add(self, check):
+    self.checks.append(check)
+
+  def initialize(self, test):
+    for check in self.checks: check.initialize(test)
+
+
+  def reset(self, test):
+    for check in self.checks: check.reset(test)
+
+
+  def starting(self, test):
+    for check in self.checks: check.starting(test)
+
+
+  def check(self, test):
+    status = PASSED
+    reasons = []
+    self.reason = None
+
+    for check in self.checks:
+      check_status = check.check(test)
+      if check_status != PASSED:
+        reasons.append(check.reason)
+        if status < check_status: status = check_status
+
+    if reasons: self.reason = ' '.join(reasons)
+
+    return status
+
+
+  def view(self, test):
+    for check in self.checks: check.view(test)
+
+
+  def log(self, test, with_expected):
+    for check in self.checks: check.log(test, with_expected)
+
+
+  def diff(self, test):
+    ret = False
+    for check in self.checks:
+      if check.diff(test): ret = True
+
+    return ret
+
+
+class CheckFileExists(Check):
+  def __init__(self, filename, size = None, min_size = None, max_size = None):
+    self.filename = filename
+
+    if size is not None and (min_size is not None or max_size is not None):
+      raise HarnessError('Cannot set both "size" and '
+                         'min_size" or "max_size"')
+
+    self.size = size
+    self.min_size = min_size
+    self.max_size = max_size
+
+
+  def check(self, test):
+    output = test.test_dir + '/' + self.filename
+
+    if not os.path.exists(output):
+      self.reason = self.filename
+      return FAILED
+
+    if self.size or self.min_size or self.max_size:
+      size = os.stat(output).st_size
+
+      if self.size and size != self.size:
+        self.reason = self.filename + '!=%d' % self.size
+        return FAILED
+
+      if self.min_size and size < self.min_size:
+        self.reason = self.filename + '<%d' % self.min_size
+        return FAILED
+
+      if self.max_size and self.max_size < size:
+        self.reason = self.filename + '>%d' % self.max_size
+        return FAILED
+
+    return PASSED
+
+
+class CheckFileSize(CheckFileExists):
+  def __init__(self, filename, size):
+    CheckFileExists.__init__(self, filename, size = size)
+
+
+class CheckFileMinSize(CheckFileExists):
+  def __init__(self, filename, size):
+    CheckFileExists.__init__(self, filename, min_size = size)
+
+
+class CheckFileMaxSize(CheckFileExists):
+  def __init__(self, filename, size):
+    CheckFileExists.__init__(self, filename, max_size = size)
+
+
+class MatchFilter:
+  def __init__(self, pattern):
+    self.re = re.compile(pattern)
+
+
+  def __call__(self, line):
+    if self.re.match(line): return line
+
+
+class NotMatchFilter(MatchFilter):
+  def __init__(self, pattern):
+    MatchFilter.__init__(self, pattern)
+
+
+  def __call__(self, line):
+    if not self.re.match(line): return line
+
+
+
+class ReplaceFilter:
+  def __init__(self, pattern, replace = None):
+    self.re = re.compile(pattern)
+    if replace is None: replace = ['']
+    if isinstance(replace, list): self.replace = replace
+    else: self.replace = list([replace])
+    self.replace = list(map(str, self.replace))
+
+
+  def __call__(self, line):
+    m = self.re.search(line)
+    if m:
+      if self.re.groups:
+        s = ''
+        pos = 0
+        count = len(self.replace)
+        for i in range(1, m.lastindex + 1):
+          if count < i: replace = ''
+          else: replace = self.replace[i - 1]
+          s += line[pos:m.start(i)] + replace
+          pos = m.end(i)
+
+        return s + line[pos:]
+
+      else: return line[0:m.start()] + self.replace[0] + line[m.end():]
+
+    else: return line
+
+
+class CheckFile(Check):
+  def __init__(self, filename, filter = None, exists = True):
+    self.filename = filename
+    self.reason = filename
+    self.exists = exists
+
+    if isinstance(filter, string_types): filter = MatchFilter(filter)
+    if isinstance(filter, (list, tuple)):
+      if not filter[0] in filter_classes:
+        raise Exception('Invalid filter "%s"' % filter[0])
+
+      klass = filter_classes[filter[0]]
+      filter = klass(*filter[1:])
+
+    self.filter = filter
+
+
+  def get_expect(self, test):
+    return test.path + '/expect/' + self.filename
+
+
+  def get_unfiltered_output(self, test):
+    return test.test_dir + '/' + self.filename
+
+
+  def get_output(self, test):
+    output = self.get_unfiltered_output(test)
+    if self.filter is not None: output += '.filtered'
+    return output
+
+
+  def initialize(self, test):
+    expect = self.get_expect(test)
+    output = self.get_output(test)
+
+    if os.path.exists(output):
+      ensure_parent_dir(expect)
+      shutil.copy(output, expect)
+
+
+  def reset(self, test):
+    try: os.unlink(self.get_expect(test))
+    except: pass
+
+
+  def compare(self, file1, file2):
+    if not (os.path.exists(file1) and os.path.exists(file2)): return FAILED
+
+    lines1 = None
+    lines2 = None
+    try:
+      lines1 = open(file1)
+      lines2 = open(file2)
+
+      while True:
+        try: line1 = lines1.next()
+        except: line1 = None
+        if line1 is not None: line1 = line1.strip('\r\n')
+
+        try: line2 = lines2.next()
+        except: line2 = None
+        if line2 is not None: line2 = line2.strip('\r\n')
+
+        if line1 != line2: return FAILED
+        if line1 is None: break
+
+      return PASSED
+
+    finally:
+      if lines1 is not None: lines1.close()
+      if lines2 is not None: lines2.close()
+
+
+  def check(self, test):
+    expect = self.get_expect(test)
+    output = test.test_dir + '/' + self.filename
+
+    if os.path.exists(output):
+      if self.filter is not None:
+        filtered = output + '.filtered'
+
+        f1 = None
+        f2 = None
+        try:
+          f1 = open(filtered, 'w')
+          f2 = open(output)
+          for line in f2:
+            line = self.filter(line)
+            if line: f1.write(line)
+
+          output = filtered
+
+        finally:
+          if f1 is not None: f1.close()
+          if f2 is not None: f2.close()
+
+      if not os.path.exists(expect): return UNINITIALIZED
+
+      return self.compare(output, expect)
+
+    elif not (self.exists or os.path.exists(expect)): return PASSED
+    else: return FAILED # Output should exist
+
+
+  def get_file_paths(self, test, with_expected):
+    if with_expected: yield self.get_expect(test)
+    yield self.get_output(test)
+    if options.view_unfiltered and self.filter:
+      yield self.get_unfiltered_output(test)
+
+
+  def get_files(self, test, with_expected):
+    for path in self.get_file_paths(test, with_expected):
+      if os.path.exists(path): yield path
+
+
+  def view(self, test):
+    expect = self.get_expect(test)
+
+    for path in self.get_files(test, True):
+      dir, name = os.path.split(path)
+      if path == expect: name = 'expect/' + name
+
+      labeled_bar(name)
+
+      data = read_file(path)
+      nl = len(data) and data[-1:] == '\n'
+      output_stream.write(data)
+      if not nl: output_stream.write('\n')
+
+
+  def log(self, test, with_expected):
+    for path in self.get_files(test, with_expected):
+      test.log.file(test, path)
+
+
+  def diff(self, test):
+    expect = self.get_expect(test)
+    output = self.get_output(test)
+
+    if not os.path.exists(expect): return None
+    if self.compare(expect, output) == PASSED: return False
+
+    if not os.path.exists(output):
+      output_stream.write('Missing "' + output + '"\n')
+      return True
+
+    f1 = None
+    f2 = None
+    try:
+      f1 = open(expect)
+      f2 = open(output)
+      result = difflib.ndiff(f1.readlines(), f2.readlines(),
+                             charjunk = lambda c: c == '\r')
+    finally:
+      if f1 is not None: f1.close()
+      if f2 is not None: f2.close()
+
+    labeled_bar('diff ' + self.filename)
+    for line in result:
+      if line[0] == '-':
+        if options.color: output_stream.write(colors['old'])
+        output_stream.write('-')
+      elif line[0] == '+':
+        if options.color: output_stream.write(colors['new'])
+        output_stream.write('+')
+
+      elif line[0] != '?': output_stream.write('|')
+
+      if line[0] != '?':
+        if line[-1:] == '\n': line = line[:-1]
+        output_stream.write(line[1:])
+        if options.color: output_stream.write(colors['none'])
+        output_stream.write('\n')
+
+    return True
+
+
+
+class CheckFilePattern(CheckFile):
+  def __init__(self, name, pattern, **kwargs):
+    CheckFile.__init__(self, name, **kwargs)
+
+    if isinstance(pattern, list): self.pattern = pattern
+    else: self.pattern = [pattern]
+
+
+  def check(self, test):
+    try:
+      # Get files
+      testPath = test.path + '/'
+      files = []
+      for pattern in self.pattern:
+        pattern = pattern % test.config
+        for path in glob.glob(pattern):
+          files.append(path.replace(testPath, ''))
+
+      files.sort()
+
+      write_file(self.get_output(test), '\n'.join(files) + '\n')
+
+      return CheckFile.check(self, test)
+
+    except Exception as e:
+      if options.verbose: output_stream.write(str(e))
+      return FAILED
+
+
+
+class StandardCheck(CheckGroup):
+  def __init__(self):
+    CheckGroup.__init__(self, [CheckFile('stdout'), CheckFile('stderr'),
+                               CheckFile('return')])
+
+
+class Table:
+  def __init__(self, columns, pad = 1, separate_rows = True, col_sep = '|',
+               corner = '+', row_sep = '-', padding = ' ', number = False,
+               header = True):
+    if number: columns += 1
+
+    self.columns = columns
+    self.pad = pad
+    self.separate_rows = separate_rows
+    self.col_sep = col_sep
+    self.corner = corner
+    self.row_sep = row_sep
+    self.padding = padding
+    self.number = number
+    self.header = header
+
+    self.widths = list(map(lambda x: 0, range(columns)))
+    self.rows = []
+
+
+  def get_width(self):
+    return (self.pad + 1) * (self.columns + 1) + \
+        reduce(operator.add, self.widths, 0)
+
+
+  def wrap(self, max):
+    if self.get_width() <= max: return [self]
+
+    # Find split point
+    width = (self.pad + 1) * 2 # min width
+    for i in range(self.columns):
+      width += self.widths[i] + self.pad + 1
+      if max < width: break
+
+    if i == 0: i = 1
+    if i == self.columns: return [self]
+
+    table1 = copy.copy(self)
+    table2 = copy.copy(self)
+
+    # Split columns
+    table1.columns = i
+    table2.columns = self.columns - i
+
+    # Split widths
+    table1.widths = self.widths[0:i]
+    table2.widths = self.widths[i:]
+    if self.number: table2.widths = [self.widths[0]] + table2.widths
+
+    # Split rows
+    table1.rows = []
+    table2.rows = []
+    for row in self.rows:
+      table1.rows.append(row[0:i])
+      if self.number: table2.rows.append([row[0]] + row[i:])
+      else: table2.rows.append(row[i:])
+
+    return [table1] + table2.wrap(max)
+
+
+  def add_row(self, row):
+    if self.number:
+      if len(self.rows) or not self.header:
+        row = [str(len(self.rows))] + row
+      else: row = ['#'] + row
+
+    # Check row width
+    if self.columns != len(row):
+      raise Exception('Row has ' + len(row) + ' columns, expected ' +
+                      self.columns)
+
+    self.rows.append(row)
+
+    # Update column widths
+    for i in range(self.columns):
+      if self.widths[i] < len(row[i]):
+        self.widths[i] = len(row[i])
+
+
+  def do_row(self, row, joint, padding):
+    pad = padding * self.pad
+    return joint + pad + (pad + joint + pad).join(row) + pad + joint + '\n'
+
+
+  def bar(self):
+    return self.do_row(list(map(lambda x: x * self.row_sep, self.widths),
+                            self.corner, self.row_sep))
+
+
+  def __str__(self):
+    if len(self.rows) == 0 or (self.header and len(self.rows) == 1):
+      return ''
+
+    if self.separate_rows or self.header: s = self.bar()
+    else: s = ''
+
+    first = True
+    for row in self.rows:
+      row = list(map(lambda cell, width:
+                     cell.center(width, self.padding), row, self.widths))
+      s += self.do_row(row, self.col_sep, self.padding)
+      if self.separate_rows or (self.header and first):
+        s += self.bar()
+      first = False
+
+    if not self.separate_rows: s += self.bar()
+
+    return s
+
+
+class CheckDB(CheckFile):
+  def __init__(self, name, db, sql = None, cols = None, table = None,
+               orderBy = None):
+    CheckFile.__init__(self, name)
+
+    def quote_column(col):
+      if col[0] == '"': return col
+      else: return '"%s"' % col
+
+    if cols is not None: cols = list(map(quote_column, cols))
+    if orderBy is not None: orderBy = list(map(quote_column, orderBy))
+
+    self.db = db
+    self.sql = sql
+    self.cols = cols
+    self.table = table
+
+    if sql is None:
+      if cols is None or table is None:
+        raise Exception('Must set either "sql" or "cols" and "table"')
+      if orderBy is None: orderBy = [cols[0]]
+      self.sql = 'SELECT ' + ', '.join(cols) + ' FROM "' + table + \
+          '" ORDER BY ' + ', '.join(orderBy)
+
+
+  def check(self, test):
+    # Clean up column names
+    header = list(map(lambda x: x.split()[len(x.split()) - 1], self.cols))
+    header = list(map(lambda x: x.strip(' "\''), header))
+
+    table = Table(len(header), 0, separate_rows = False, number = True)
+    table.add_row(header)
+
+    # Check DB exists
+    db = test.test_dir + '/' + self.db
+    if not os.path.exists(db): return FAILED
+
+    # Get table rows
+    try:
+      conn = sqlite3.connect(db)
+      c = conn.cursor()
+      c.execute(self.sql)
+      for row in c: table.add_row(list(map(str, row)))
+      c.close()
+    except Exception as e: return FAILED
+
+    # Write
+    write_file(self.get_output(test),
+               '\n'.join(filter(len, map(str, table.wrap(80)))))
+
+    return CheckFile.check(self, test)
+
+
+class CheckCommand(CheckFile):
+  def __init__(self, name, command, filter = None, exists = True):
+    CheckFile.__init__(self, name, filter, exists)
+
+    self.name = name
+    self.command = command
+
+
+  def check(self, test):
+    out = None
+
+    try:
+      path = test.test_dir + '/' + self.name
+      out = open(path, 'w')
+
+      execute_proc(self.command, shell = False, stdout = out,
+                   stderr = out, cwd = test.test_dir,
+                   timeout = test.config['timeout'])
+
+    finally:
+      if out is not None: out.close()
+
+    return CheckFile.check(self, test)
+
+
+class Unit:
+  def __init__(self, parent, name, command = None,
+               test = None, start_test = None, end_test = None, **kwargs):
+    self.parent = parent
+    self.suite = parent
+    self.name = name
+    self.invalid = False
+    self.status = None
+    self.reason = None
+    self.log = logger
+
+    # Prep config
+    self.config = kwargs
+
+    # Paths
+    if isinstance(parent, Test):
+      self.path = parent.name + '/' + self.name
+      parent.add_unit(self)
+      self.suite = parent.suite
+      self.test_dir = parent.test_dir
+
+    else:
+      self.path = self.name
+      self.test_dir = self.path + '/run'
+
+    self.config['test-dir'] = self.test_dir
+    self.config['data-dir'] = self.data_dir = self.path + '/data'
+    self.config['expect-dir'] = self.path + '/expect'
+
+    # Functions
+    self.default_test = self.test
+    if test is not None: self.test = test
+
+    self.default_start_test = self.start_test
+    if start_test is not None: self.start_test = start_test
+
+    self.default_end_test = self.end_test
+    if end_test is not None: self.end_test = end_test
+
+    # Load test config
+    try:
+      path = parent.path + '/' + self.path + '/test.json'
+      if os.path.exists(path):
+        self.config.update(json.loads(read_file(path)))
+
+    except Exception as e:
+      raise HarnessError('Failed to parse test.json file in %s: %s' % (
+         self.get_full_name(), e))
+
+    # Checks
+    checks = parent.config.get('checks', []) + self.config.get('checks', [])
+
+    if not checks: self.check = StandardCheck()
+    else:
+      self.check = CheckGroup()
+
+      for check in checks:
+        if isinstance(check, Check): self.check.add(check)
+        else:
+          if isinstance(check, string_types):
+            check = [check]
+
+          if isinstance(check, (list, tuple)) and len(check):
+            if not check[0] in check_classes:
+              raise Exception('Invalid check "%s" in %s' %
+                              (check[0], self.name))
+
+            klass = check_classes[check[0]]
+            self.check.add(klass(*check[1:]))
+
+    # Inherit parent config
+    config = copy.deepcopy(parent.config)
+
+    config.update(self.config)
+    self.config = config
+
+
+  def config_get(self, name, default = None):
+    return self.config.get(name, default) % self.config
+
+
+  def config_get_list(self, name, default = None, split = str.split):
+    value = self.config.get(name, default)
+    if isinstance(value, string_types): value = split(value)
+
+    try:
+      return list(map(lambda item: item % self.config, value))
+    except Exception as e:
+      raise HarnessError('Error resolving %s "%s": %s' % (name, value, e))
+
+
+  def get_full_name(self):
+    if self.parent is not None:
+      return self.parent.get_full_name() + '/' + self.name
+    return self.name
+
+
+  def get_root_config(self):
+    if self.parent is None: return self.config
+    return self.parent.get_root_config()
+
+
+  def call_with_less(self, method):
+    stream = output_stream
+    p = None
+
+    try:
+      p = subprocess.Popen(['less', '-R'], stdin = subprocess.PIPE)
+      output_stream = p.stdin
+
+      try:
+        method()
+      except: pass
+
+    finally:
+      if p is not None:
+        p.stdin.flush()
+        p.communicate()
+
+      output_stream = stream
+
+
+  def failed(self):
+    if self.status == FAILED or self.status == INVALID or\
+          self.status == UNINITIALIZED: return 1
+    return 0
+
+
+  def initialize(self):
+    self.check.initialize(self)
+    self.status = INITIALIZED
+
+
+  def reset(self):
+    self.check.reset(self)
+    self.status = UNINITIALIZED
+
+
+  def view(self):
+    labeled_bar('command')
+    output_stream.write(quote_cmd(self.get_command()) + '\n')
+    self.check.view(self)
+    bar()
+
+
+  def diff(self):
+    if not os.path.exists(self.test_dir): self.run()
+    if self.check.diff(self): bar()
+    return self.failed()
+
+
+  def enable(self): pass
+  def disable(self): pass
+  def is_enabled(self): return True
+  def cleanup(self, force = False): pass
+
+
+  def get_stdin_file(self):
+    stdin = self.config.get('stdin', None)
+
+    if isinstance(stdin, string_types): return StringIO(stdin)
+
+    if stdin is None and 'stdin_file' in self.config:
+      path = self.config_get('stdin_file')
+      if os.path.exists(path): return open(path, 'rb')
+
+    return stdin
+
+
+  def get_args(self):
+    if 'args' in self.config: return split_cmd_line(self.config['args'])
+
+    path = self.config_get('args_file')
+    if os.path.exists(path): return split_cmd_line(read_file(path))
+
+    return []
+
+
+  def get_command(self):
+    # Command
+    if not 'command' in self.config: raise HarnessError('"command" not set')
+    command = split_cmd_line(self.config['command'])
+    if options.command_prefix: command = options.command_prefix + command
+
+    # Args
+    command += self.get_args()
+
+    # Resolve command vars refs
+    try:
+      command = list(map(lambda s: s % self.config, command))
+    except Exception as e:
+      raise HarnessError('Error resolving command "%s": %s' % (command, e))
+
+    return command
+
+
+  def test(self, test = None):
+    stdin = None
+    stdout = None
+    stderr = None
+    returncode = None
+
+    try:
+      output_stream.flush()
+
+      # Environment
+      if 'env' in self.parent.config or 'env' in self.config:
+        env = self.parent.config.get('env', {})
+        env.update(self.config.get('env', {}))
+
+      else: env = None
+
+      # Run test
+      returncode = execute_proc(
+        self.get_command(),
+        shell = self.config.get('shell', False),
+        stdin = self.get_stdin_file(),
+        stdout = open(self.test_dir + '/' + 'stdout', 'w'),
+        stderr = open(self.test_dir + '/' + 'stderr', 'w'),
+        cwd = self.test_dir,
+        env = env,
+        timeout = self.config['timeout'])
+
+    finally:
+      # Close files
+      if stdout is not None: stdout.close()
+      if stderr is not None: stderr.close()
+      if stdin is not None: stdin.close()
+
+      if returncode is None: self.invalid = True
+
+    # Write return code
+    write_file(self.test_dir + '/' + 'return', str(returncode) + '\n')
+
+
+  def start_test(self):
+    self.cleanup(True)
+
+    if self.invalid: self.status = INVALID
+    elif not self.is_enabled(): self.status = DISABLED
+    else:
+      self.status = None
+      if not os.path.exists(self.test_dir):
+        os.makedirs(self.test_dir)
+
+        # Copy files
+        for pattern in self.config_get_list('copy', []):
+          copy_pattern(pattern, self.test_dir)
+
+
+  def end_test(self): pass
+
+
+  def run(self):
+    self.log.start_test(self)
+    self.start_test()
+
+    if self.status is None:
+      # Run it
+      self.check.starting(self)
+      self.test(self)
+      self.status = self.check.check(self)
+
+      # Check status
+      if self.status is None: raise Exception('Test result not set')
+      self.reason = self.check.reason
+
+    # Logging
+    self.log.start_files()
+    stdin = self.get_stdin_file()
+    if stdin is not None: self.log.insert('stdin', stdin.read(10000))
+    self.check.log(self, self.failed())
+    self.log.end_files()
+    self.log.end_test(self)
+
+    self.end_test()
+
+    if self.failed() and options.diff_failed: self.diff()
+    if ((self.failed() and options.view_failed) or options.view_all):
+      self.view()
+
+    return self.failed()
+
+
+  def interact(self):
+    stream = output_stream
+
+    while options.interactive:
+      stream.write('(a)bort (c)ontinue (x)disable (d)iff (i)nitialize '
+                   '(r)eset (t)est (q)uit (v)iew? ')
+      stream.flush()
+
+      cmd = sys.stdin.readline()[0]
+
+      if cmd == 'a':
+        options.save = True
+        sys.exit(0)
+
+      elif cmd == 'c': break
+      elif cmd == 'x':
+        self.disable()
+        break
+      elif cmd == 'd': self.diff()
+      elif cmd == 'D': self.call_with_less(self.diff)
+      elif cmd == 'i':
+        self.initialize()
+        break
+      elif cmd == 'r': self.reset()
+      elif cmd == 't': self.run()
+      elif cmd == 'q': options.interactive = False
+      elif cmd == 'v': self.view()
+      elif cmd == 'V': self.call_with_less(self.view)
+      elif cmd == '\n' or cmd == '\r': break # Continue
+      else: stream.write("Invalid command '" + cmd + "'\n")
+
+      # Reprint test name and results line
+      if cmd in ['v', 'd']:
+        self.log.start_test(self)
+        self.log.end_test(self)
+
+
+  def run_interactive(self):
+    self.run()
+    if ((self.status != PASSED and self.status != DISABLED) or
+        options.force_interactive): self.interact()
+    return self.failed()
+
+
+class Test(Unit):
+  def __init__(self, *args, **kwargs):
+    Unit.__init__(self, *args, **kwargs)
+
+    self.units = None
+
+
+  def get_full_name(self):
+    if self.suite is not None:
+      return self.suite.get_full_name() + '/' + self.name
+    return self.name
+
+
+  def add_unit(self, unit):
+    if self.units is None: self.units = []
+    self.units.append(unit)
+
+
+  def Unit(self, *args, **kwargs):
+    return Unit(self, self.config, *args, **kwargs)
+
+
+  def Test(self, *args, **kwargs):
+    return self.Unit(*args, **kwargs)
+
+
+  def get(self, name):
+    if self.units is None: return None
+    for unit in self.units:
+      if name == unit.name: return unit
+
+
+  def initialize(self):
+    if self.units is None: Unit.initialize(self)
+    else: list(map(Unit.initialize, self.units))
+
+
+  def reset(self):
+    if self.units is None: Unit.reset(self)
+    else: list(map(Unit.reset, self.units))
+
+
+  def view(self):
+    if self.units is None: Unit.view(self)
+
+
+  def diff(self):
+    if self.units is None: return Unit.diff(self)
+    return False
+
+
+  def init(self):
+    self.reset()
+    if not os.path.exists(self.test_dir):
+      self.run_interactive()
+      if self.failed(): return 1
+
+    self.initialize()
+
+
+  def enable(self):
+    try: os.unlink(self.path + '/' + 'disable')
+    except: pass
+
+
+  def disable(self):
+    if not os.path.exists(self.path): os.makedirs(self.path)
+
+    open(self.path + '/' + 'disable', 'w').close()
+    self.status = DISABLED
+
+
+  def is_enabled(self):
+    return not os.path.exists(self.path + '/' + 'disable')
+
+
+  def cleanup(self, force = False):
+    if os.path.exists(self.test_dir):
+      if force or not (
+        options.save or (options.save_failed and self.failed())):
+        remove_tree(self.test_dir)
+
+
+  def run(self):
+    if self.units is None: Unit.run(self)
+    else:
+      self.log.start_test(self)
+      self.start_test()
+
+      if self.status is None:
+        self.status = PASSED
+        for unit in self.units:
+          if unit.run_interactive() and self.status == PASSED:
+            self.status = unit.status
+
+      self.end_test()
+      self.log.end_test(self)
+
+    return self.failed()
+
+
+  def run_interactive(self):
+    if self.units is None: return Unit.run_interactive(self)
+    else: return self.run()
+
+
+
+class TestSuite:
+  def __init__(self, config, tests = [], name = None, parent = None,
+               path = None):
+    self.config = copy.copy(config)
+    if path is None: self.path = os.getcwd()
+    else: self.path = path
+    self.parent = parent
+
+    self.children = []
+    self.interface = None
+    self.loaded = False
+    self.valid = False
+    self.log = logger
+
+    self.config['suite-dir'] = self.path
+
+    if options.verbose: output_stream.write('Suite: %s\n' % self.path)
+
+    # Name
+    if name is None:
+      if self.path is not None: dir, self.name = os.path.split(self.path)
+      else: dir, self.name = os.path.split(os.getcwd())
+
+      if self.name == '.': dir, self.name = os.path.split(os.getcwd())
+    else: self.name = name
+
+    # Tests
+    self.tests = []
+    for test in tests: self.add_test(test)
+
+    # Don't inherit these
+    for name in 'build clean'.split():
+      if name in self.config: del self.config[name]
+
+    # Load test config
+    path = self.path + '/test.json'
+    if os.path.exists(path):
+      try:
+        self.config.update(json.loads(read_file(path)))
+      except Exception as e:
+        raise HarnessError('Failed to parse suite test.json: ' + str(e))
+
+      if 'command' in self.config:
+        self.config['command'] = split_cmd_line(self.config['command'])
+
+      if 'args' in self.config:
+        self.config['args'] = split_cmd_line(self.config['args'])
+
+
+  # Utility functions
+  def system(self, cmd, **kwargs):
+    if execute_proc(cmd, timeout = self.config['timeout'], shell = True,
+                    **kwargs):
+      raise HarnessError('Command "%s" failed' % str(cmd))
+
+
+  def call(self, name, *args, **kwargs):
+    self.load()
+
+    if not self.valid: return
+
+    save_cwd = os.getcwd()
+    try:
+      os.chdir(self.path)
+
+      if name in self.config:
+        self.system(self.config[name])
+
+      elif hasattr(self.interface, name):
+        method = getattr(self.interface, name)
+        if callable(method): method(*args, **kwargs)
+
+    finally: os.chdir(save_cwd)
+
+
+  def call_recursive(self, name, *args, **kwargs):
+    self.load()
+    self.call(name, *args, **kwargs)
+    for child in self.children:
+      child.call_recursive(name, *args, **kwargs)
+
+
+  def begin(self): self.call('begin')
+  def end(self): self.call('end')
+  def build(self): self.call_recursive('build')
+  def clean(self): self.call_recursive('clean')
+
+
+  def add_test(self, test):
+    self.tests.append(test)
+
+
+  def Test(self, *args, **kwargs):
+    if options.verbose: output_stream.write('Installing test "%s"\n' % args[0])
+    t = Test(self, *args, **kwargs)
+    self.add_test(t)
+    return t
+
+
+  def Suite(self, name):
+    path = self.path + '/' + name
+    suite = TestSuite(self.config, path = path, name = name, parent = self)
+    suite.loaded = True
+    self.children.append(suite)
+    return suite
+
+
+  def set_interface(self, interface):
+    if self.interface is not None and self.interface != interface:
+      raise HarnessError("interface already set in '%s'" %
+                         self.get_full_name())
+    self.interface = interface
+
+
+  def get(self, name):
+    self.load()
+
+    if name.endswith('/'): name = name[:-1]
+
+    for test in self.tests:
+      if name == test.name: return test
+      elif name.startswith(test.name + '/'):
+        return test.get(name[len(test.name) + 1:])
+
+    for child in self.children:
+      if name == child.name: return child
+      elif name.startswith(child.name + '/'):
+        return child.get(name[len(child.name) + 1:])
+
+
+  def get_full_name(self):
+    if self.parent is not None:
+      return self.parent.get_full_name() + '/' + self.name
+    return self.name
+
+
+  def get_root_config(self):
+    if self.parent is None: return self.config
+    return self.parent.get_root_config()
+
+
+  def load(self):
+    if self.loaded: return
+    self.loaded = True
+
+    # Find child tests
+    if 'tests' in self.config: paths = self.config['tests']
+    else: paths = glob.glob(self.path + '/*Test')
+    for path in paths: self.Test(os.path.basename(path))
+
+    # Load script
+    if 'script' in self.config: script = self.path + '/' + self.config['script']
+    else: self.script = self.path + '/' + self.config['script']
+
+    if os.path.exists(script):
+      env = {}
+      env.update(globals())
+
+      try: execfile(script, env)
+      except Exception as e:
+        raise Exception('Exception in "%s": %s' % (script, str(e)))
+
+      if not 'Suite' in env:
+        raise HarnessError(
+          'Test suite "%s" did not define a Suite class' % script)
+
+      Suite = env['Suite']
+
+      if not isinstance(Suite, ClassType):
+        raise HarnessError('Test suite "%s" defined non-class Suite' %
+                           script)
+
+      self.set_interface(Suite(self))
+
+    # Find child suites
+    if 'suites' in self.config: paths = self.config['suites']
+    else: paths = glob.glob(self.path + '/*Tests')
+    for path in paths:
+      suite = TestSuite(self.config, path = path, parent = self)
+      self.children.append(suite)
+
+    self.valid = True
+
+
+  def run(self, withChildren = True):
+    failures = 0
+
+    self.load()
+
+    if self.valid:
+      self.log.start_suite(self)
+      self.begin()
+
+      save_cwd = os.getcwd()
+      try:
+        for test in self.tests:
+          os.chdir(self.path)
+          failures += test.run_interactive()
+          test.cleanup()
+          os.chdir(save_cwd)
+
+      finally: os.chdir(save_cwd)
+
+      if withChildren:
+        for child in self.children: failures += child.run()
+
+      self.end()
+      self.log.end_suite(self)
+
+    return failures
+
+
+  def find_executable(self, name, conf_name = None, paths = None,
+                      home_var = None):
+    if conf_name is not None and conf_name in self.config:
+      return os.path.realpath(self.config[conf_name])
+
+    extensions = ['']
+    if sys.platform == 'win32': extensions.append('.exe')
+
+    if conf_name is not None and home_var is None:
+      home_var = conf_name.upper().replace('-', '_') + '_HOME'
+      if home_var in os.environ:
+        if paths is None: paths = []
+        paths = [os.environ[home_var]] + paths
+
+    if paths is None:
+      paths = ['.'] + os.environ['PATH'].split(os.pathsep)
+
+    for path in paths:
+      for ext in extensions:
+        exec_name = os.path.join(path, name + ext)
+
+        if os.path.isfile(exec_name) and os.access(exec_name, os.X_OK):
+          return os.path.realpath(exec_name)
+
+    errStr = "'%s' not found and variable '%s' not set" % (name, conf_name)
+    if home_var is not None and home_var in os.environ:
+      errStr += ' and ' + home_var + '=' + os.environ[home_var]
+    raise Exception(errStr)
+
+
+class TestResults:
+  def __init__(self):
+    self.reset()
+
+
+  def reset(self):
+    self.passed = 0
+    self.uninitialized = 0
+    self.initialized = 0
+    self.failed = 0
+    self.disabled = 0
+    self.invalid = 0
+    self.suites = 0
+    self.tests = 0
+    self.startTime = 0
+    self.endTime = 0
+
+
+  def add_test(self, test):
+    self.tests += 1
+
+    if test.status == PASSED: self.passed += 1
+    elif test.status == FAILED: self.failed += 1
+    elif test.status == UNINITIALIZED: self.uninitialized += 1
+    elif test.status == INITIALIZED: self.initialized += 1
+    elif test.status == DISABLED: self.disabled += 1
+    elif test.status == INVALID: self.invalid += 1
+
+
+  def add_suite(self, suite):
+    if suite.valid:
+      self.suites += 1
+      for test in suite.tests: self.add_test(test)
+
+    for child in suite.children: self.add_suite(child)
+
+
+class TestHarness(TestSuite):
+  def __init__(self, config):
+    TestSuite.__init__(self, config)
+    self.results = TestResults()
+    self.log = logger
+
+
+  def run(self, args = None):
+    failures = 0
+
+    self.results.startTime = datetime.datetime.now()
+
+    self.load()
+
+    if args and len(args) > 2:
+      raise HarnessError('Too many arguments', True)
+
+    if args and len(args) > 0:
+      cmd = args[0]
+
+      if len(args) == 2:
+        target = self.get(args[1])
+        if target is None:
+          raise HarnessError('Target not found')
+      else: target = self
+
+      if isinstance(target, Unit):
+        if len(args) != 2:
+          raise HarnessError('Command requires argument', True)
+
+        save_cwd = os.getcwd()
+        try:
+          os.chdir(target.suite.path)
+
+          if cmd == 'enable': target.enable()
+          elif cmd == 'diff': failures += target.diff()
+          elif cmd == 'disable': target.disable()
+          elif cmd == 'init': failures += target.init()
+          elif cmd == 'reset': target.reset()
+          elif cmd == 'view': target.view()
+          elif cmd == 'build': target.suite.build()
+          elif cmd == 'clean': target.suite.clean()
+          elif cmd in ['run', 'setup']:
+            if isinstance(target, Test):
+              if options.build: target.suite.build()
+              target.suite.begin()
+              if cmd == 'run':
+                failures += target.run_interactive()
+              else: target.start_test()
+              target.suite.end()
+            else: raise HarnessError('Cannot run Unit directly')
+          else: raise HarnessError('Invalid command "%s"' % cmd, True)
+
+        finally:
+          if cmd != 'setup': target.cleanup()
+          os.chdir(save_cwd)
+
+      elif cmd == 'run':
+        if options.build: target.build()
+        failures += target.run()
+      elif cmd == 'setup':
+        raise HarnessError('Cannot run "setup" on a test suite', True)
+      elif cmd == 'build': target.build()
+      elif cmd == 'clean': target.clean()
+      else: raise HarnessError('Invalid command "%s" for target' % cmd, True)
+
+    else:
+      if options.build: self.build()
+      self.log.start()
+
+      failures += TestSuite.run(self)
+      self.results.add_suite(self)
+      self.results.endTime = datetime.datetime.now()
+
+      if self.results.tests == 0:
+        output_stream.write('No tests found.\n')
+        failures += 1
+
+      else: self.log.summary(self.results)
+
+      self.log.end()
+
+    if options.output_json is not None:
+      data = json.dumps(self.log.json, indent = 2, separators = [',', ': '])
+      write_file(options.output_json, data)
+
+    return failures
+
+
+usage = '''\
+Usage: %prog [options] [command] [name=value...]
+
+Command:
+  enable <target>      enable a previously disabled a test
+  diff <target>        diff results
+  disable <target>     disable a test
+  init <target>        initialize a test
+  reset <target>       reset a test by removing its expect files
+  view <target>        view a test's files
+  run <target>         run a specific test
+  setup <target>       setup but do not run a specific test
+  build [target]       call test suite build methods
+  clean [target]       call test suite clean methods
+
+  "target" can either be the path to a test or a test suite relative
+  to the current directory.
+
+  If no command is given all tests will be run.
+'''
+
+
+# Get default screen width
+import platform
+
+if platform.system() == 'Windows' or True: screen_width = 80
+else:
+  import curses
+  win = curses.initscr()
+  screen_height, screen_width = win.getmaxyx()
+  if screen_width > 100: screen_width = 100
+  curses.endwin()
+
+output_stream = sys.stdout
+
+config = {
+  'top': os.getcwd(),
+  'script': 'th.py',
+  'stdin_file': '%(data-dir)s/stdin',
+  'args_file': '%(data-dir)s/args',
+  'copy': '%(data-dir)s/*',
+  'timeout': 300
+  }
+
+check_classes = {
+  'exists': CheckFileExists,
+  'size': CheckFileSize,
+  'min_size': CheckFileMinSize,
+  'max_size': CheckFileMaxSize,
+  'file': CheckFile,
+  'standard': StandardCheck,
+  'db': CheckDB,
+  'command': CheckCommand
+}
+
+filter_classes = {
+  'match': MatchFilter,
+  'not_match': NotMatchFilter,
+  'replace': ReplaceFilter
+}
+
+
+# Setup command line options
+parser = OptionParser(usage = usage)
+parser.add_option('-I', '--interactive', help = 'run tests in interactive mode',
+                  default = False, action = 'store_true', dest = 'interactive')
+parser.add_option('-f', '--force-interactive', help = 'go to interactive mode '
+                  'even if tests pass', default = False, action = 'store_true',
+                  dest = 'force_interactive')
+parser.add_option('-V', '--valgrind', help = 'run tests under valgrind',
+                  default = False, action = 'store_true', dest = 'valgrind')
+parser.add_option('-P', '--command-prefix', help = 'prefix test commands',
+                  default = [], dest = 'command_prefix')
+parser.add_option('-v', '', help = 'verbose output',
+                  default = False, action = 'store_true', dest = 'verbose')
+parser.add_option('', '--no-color', help = 'disable color output',
+                  default = (platform.system() != 'Windows'),
+                  action = 'store_false', dest = 'color')
+parser.add_option('-c', '--config', help = 'set configuration file',
+                  dest = 'config')
+parser.add_option('-C', '', help = 'Change to directory before running tests',
+                  dest = 'chdir', default = None)
+parser.add_option('-d', '--dump', help = 'print the config and exit',
+                  action = 'store_true', default = False, dest = 'dump_config')
+parser.add_option('-s', '--save', help = 'save all test results',
+                  action = 'store_true', default = False, dest = 'save')
+parser.add_option('', '--save-failed', help = 'save failed test results',
+                  action = 'store_true', default = False, dest = 'save_failed')
+parser.add_option('', '--view-failed', help = 'view failed test results',
+                  action = 'store_true', default = False, dest = 'view_failed')
+parser.add_option('', '--view-all', help = 'view all test results',
+                  action = 'store_true', default = False, dest = 'view_all')
+parser.add_option('', '--diff-failed', help = 'diff failed test results',
+                  action = 'store_true', default = False, dest = 'diff_failed')
+parser.add_option('', '--view-unfiltered', help = 'display unfiltered files '
+                  'as well as the filtered results when viewing',
+                  action = 'store_true', default = False,
+                  dest = 'view_unfiltered')
+parser.add_option('', '--build', help = 'build tests before running',
+                  default = False, action = 'store_true', dest = 'build')
+parser.add_option('', '--json', help = 'write JSON log file',
+                  dest = 'output_json')
+
+# Parse args
+options, args = parser.parse_args()
+
+# Change dir
+if options.chdir is not None:
+  os.chdir(options.chdir)
+  if options.verbose: print("Changed directory: " + os.getcwd())
+
+# Load config file
+if options.config is not None: config_file = options.config
+else: config_file = None
+if config_file is not None: execfile(config_file, globals(), config)
+
+# Set logger
+logger = Logger()
+
+# Force interactive
+if options.force_interactive: options.interactive = True
+
+# Process name value pairs
+nvRE = re.compile(r'((\w|-)+)=(.*)')
+cmd_args = []
+for arg in args:
+  m = nvRE.match(arg)
+  if m: config[m.group(1)] = m.group(3)
+  else: cmd_args.append(arg)
+
+# Parse command prefix
+options.command_prefix = split_cmd_line(options.command_prefix)
+
+# Valgrind
+if options.valgrind:
+  options.command_prefix = \
+      ['valgrind', '-q', '--trace-children=yes'] + options.command_prefix
+
+
+if options.dump_config:
+  for name, value in config.items():
+    print("%s=%s" % (name, value))
+  sys.exit(0)
+
+# Run
+try:
+  sys.exit(TestHarness(config).run(cmd_args))
+
+except HarnessError as e:
+  sys.stdout.flush()
+  if e.show_usage: parser.error(e.msg)
+  else: sys.stderr.write('ERROR: ' + e.msg + '\n')
+
+  sys.exit(-1)

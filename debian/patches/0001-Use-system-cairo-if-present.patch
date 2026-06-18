@@ -1,0 +1,68 @@
+From 7c706e6a2b6ed9ca047c60756dfdb115c3014f38 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Rakitni=C4=8Dan?= <samuel.rakitnican@gmail.com>
+Date: Fri, 26 May 2017 16:43:40 +0200
+Subject: [PATCH 1/2] Use system cairo if present
+
+Backported from upstream commits c64cc99 and 7f4cecb
+---
+ SConstruct | 16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
+
+diff --git a/SConstruct b/SConstruct
+index b378317..7cf7ced 100644
+--- a/SConstruct
++++ b/SConstruct
+@@ -11,6 +11,7 @@ major, minor, revision = version.split('.')
+ # Setup
+ env = Environment(ENV = os.environ,
+                   TARGET_ARCH = os.environ.get('TARGET_ARCH', 'x86'))
++Export('env')
+ env.Tool('config', toolpath = [cbang])
+ env.CBAddVariables(
+     ('install_prefix', 'Installation directory prefix', '/usr/local/'),
+@@ -60,6 +61,7 @@ if 'dist' in COMMAND_LINE_TARGETS:
+     Return()
+ 
+ 
++have_cairo = False
+ if not env.GetOption('clean'):
+     if qt_version == '5': env.Replace(cxxstd = 'c++11')
+ 
+@@ -86,6 +88,10 @@ if not env.GetOption('clean'):
+ 
+     conf.CBConfig('opengl')
+ 
++    # Cairo
++    have_cairo = \
++        conf.CBCheckCHeader('cairo/cairo.h') and conf.CBCheckLib('cairo')
++
+     # Include path
+     env.AppendUnique(CPPPATH = ['#/src'])
+ 
+@@ -144,10 +150,10 @@ libs.append(env.Library('clipper', Glob('build/clipper/*.cpp')))
+ 
+ 
+ # Cairo
+-Export('env')
+-cairo = SConscript('src/cairo/SConscript', variant_dir = 'build/cairo')
+-Depends(lib, cairo)
+-env.Append(_LIBFLAGS = [cairo]) # Force to end
++if not have_cairo:
++    cairo = SConscript('src/cairo/SConscript', variant_dir = 'build/cairo')
++    Depends(lib, cairo)
++    env.Append(_LIBFLAGS = [cairo]) # Force to end
+ 
+ 
+ # Build programs
+@@ -163,7 +169,7 @@ for prog in progs.split():
+     p = _env.Program(prog, ['build/%s.cpp' % prog] + libs + [qrc])
+     _env.Precious(p)
+     _env.Install(env.get('install_prefix') + '/bin/', p)
+-    Depends(p, cairo)
++    if not have_cairo: Depends(p, cairo)
+     Default(p)
+     execs.append(p)
+ 
+-- 
+2.9.4
+

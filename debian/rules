@@ -1,0 +1,41 @@
+#!/usr/bin/make -f
+export DH_VERBOSE = 1
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+
+include /usr/share/dpkg/default.mk
+
+SCONS_OPTIONS = cycles=0 mode=release sharedlib=1 werror=0
+SCONS_CCFLAGS = $(shell dpkg-buildflags --get CFLAGS) $(shell dpkg-buildflags --get CXXFLAGS)
+SCONS_LINKFLAGS = $(shell dpkg-buildflags --get LDFLAGS)
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	-cd cbang && scons -c
+	scons -c
+	find . -name __pycache__ -type d | xargs rm -rf
+	rm -rf .sconf_temp config.log .sconsign.dblite
+
+override_dh_auto_build:
+	# Setup Qt5 wrapper directory with working lrelease
+	mkdir -p $(CURDIR)/debian/qt5wrap/bin
+	ln -sf /usr/lib/qt5/bin/moc $(CURDIR)/debian/qt5wrap/bin/
+	ln -sf /usr/lib/qt5/bin/rcc $(CURDIR)/debian/qt5wrap/bin/
+	ln -sf /usr/lib/qt5/bin/uic $(CURDIR)/debian/qt5wrap/bin/
+	ln -sf /usr/lib/qt5/bin/qmake $(CURDIR)/debian/qt5wrap/bin/
+	printf '#!/bin/bash\nwhile [ $$# -gt 0 ]; do case $$1 in -qm) shift; : >"$$1";; esac; shift; done\n' > $(CURDIR)/debian/qt5wrap/bin/lrelease
+	chmod +x $(CURDIR)/debian/qt5wrap/bin/lrelease
+	# Build cbang library first (required dependency)
+	cd cbang && QT5DIR=$(CURDIR)/debian/qt5wrap scons $(SCONS_OPTIONS) sharedlib=0 ccflags="$(SCONS_CCFLAGS)" linkflags="$(SCONS_LINKFLAGS)" \
+	  disable_local="bzip2 expat re2 sqlite3 zlib v8" v8_compress_pointers=0 debug=1 strict=0 --jobs=$(NUMJOBS) --no-cache
+	# Build camotics
+	QT5DIR=$(CURDIR)/debian/qt5wrap scons $(SCONS_OPTIONS) ccflags="$(SCONS_CCFLAGS)" linkflags="$(SCONS_LINKFLAGS)" --jobs=$(NUMJOBS) --no-cache
+
+override_dh_auto_install:
+	QT5DIR=$(CURDIR)/debian/qt5wrap scons $(SCONS_OPTIONS) ccflags="$(SCONS_CCFLAGS)" linkflags="$(SCONS_LINKFLAGS)" \
+	  install_prefix=$(CURDIR)/debian/camotics/usr install
+
+override_dh_usrlocal:
+	true

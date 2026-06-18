@@ -1,0 +1,45 @@
+{
+  "props": {"os": "osx"},
+
+  "env": {
+    "TARGET_ARCH":     "x86_64",
+    "OPENSSL_HOME":    "${HOME}/build/openssl-3.0.7",
+    "V8_HOME":         "${HOME}/build/v8",
+    "QTDIR":           "${HOME}/build/Qt5.12.12/5.12.12/clang_64",
+    "PATH": [
+      "${HOME}/Library/Python/3.9/bin",
+      "${HOME}/bin",
+      "${HOME}/build/Qt5.12.12/5.12.12/clang_64/bin",
+      "${PATH}"
+    ],
+    "PKG_CONFIG_PATH": "${HOME}/build/Qt5.12.12/5.12.12/clang_64/lib/pkgconfig",
+    "SCONS_OPTIONS": {
+      "compiler":          "clang",
+      "ccflags":           "-Wno-unused-local-typedef -DQT_INIT_METAOBJECT=''",
+      "cxxflags":          "-stdlib=libc++",
+      "linkflags":         "-stdlib=libc++",
+      "cxxstd":            "c++17",
+      "disable_local":     "libevent re2",
+      "osx_min_ver":       "10.13",
+      "osx_archs":         "x86_64",
+      "package_arch":      "x86_64",
+      "sign_keychain":     "${SIGN_KEYCHAIN}",
+      "sign_id_installer": "${SIGN_ID_INSTALLER}",
+      "sign_id_app":       "${SIGN_ID_APP}",
+      "sign_prefix":       "org.camotics.",
+      "notarize_profile":  "${NOTARIZE_PROFILE}"
+    }
+  },
+
+  "modes": {
+    "debug": {
+      "V8_LIBPATH": "${HOME}/build/v8/out/x64.debug/obj",
+      "SCONS_OPTIONS": {"notarize_disable": 1}
+    },
+    "release": {"V8_LIBPATH": "${HOME}/build/v8/out/x64.release/obj"}
+  },
+
+  "builds": {
+    "camotics": {"projects": ["camotics"]}
+  }
+}

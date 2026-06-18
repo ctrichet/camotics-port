@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>CAMLayerDialog</class>
+ <widget class="QDialog" name="CAMLayerDialog">
+  <property name="windowModality">
+   <enum>Qt::ApplicationModal</enum>
+  </property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>545</width>
+    <height>292</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Layer CAM</string>
+  </property>
+  <property name="modal">
+   <bool>true</bool>
+  </property>
+  <layout class="QGridLayout" name="gridLayout" columnstretch="0,1,1">
+   <item row="1" column="1">
+    <widget class="QSpinBox" name="toolSpinBox">
+     <property name="maximum">
+      <number>999</number>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QComboBox" name="layerComboBox"/>
+   </item>
+   <item row="8" column="0">
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLabel" name="label_2">
+     <property name="font">
+      <font>
+       <underline>true</underline>
+      </font>
+     </property>
+     <property name="text">
+      <string>Feed</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="0">
+    <widget class="QLabel" name="label_4">
+     <property name="font">
+      <font>
+       <underline>true</underline>
+      </font>
+     </property>
+     <property name="text">
+      <string>Offset</string>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="1">
+    <widget class="QDoubleSpinBox" name="startDepthDoubleSpinBox">
+     <property name="suffix">
+      <string> mm</string>
+     </property>
+     <property name="decimals">
+      <number>5</number>
+     </property>
+     <property name="minimum">
+      <double>-1000000.000000000000000</double>
+     </property>
+     <property name="maximum">
+      <double>1000000.000000000000000</double>
+     </property>
+    </widget>
+   </item>
+   <item row="7" column="0">
+    <widget class="QLabel" name="label_5">
+     <property name="font">
+      <font>
+       <underline>true</underline>
+      </font>
+     </property>
+     <property name="text">
+      <string>Max step down</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QLabel" name="label">
+     <property name="font">
+      <font>
+       <underline>true</underline>
+      </font>
+     </property>
+     <property name="text">
+      <string>Tool</string>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="1">
+    <widget class="QSpinBox" name="speedSpinBox">
+     <property name="suffix">
+      <string> RPM</string>
+     </property>
+     <property name="maximum">
+      <number>1000000</number>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="0">
+    <widget class="QLabel" name="label_7">
+     <property name="font">
+      <font>
+       <underline>true</underline>
+      </font>
+     </property>
+     <property name="text">
+      <string>Layer</string>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0">
+    <widget class="QLabel" name="label_3">
+     <property name="font">
+      <font>
+       <underline>true</underline>
+      </font>
+     </property>
+     <property name="text">
+      <string>Speed</string>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="0">
+    <widget class="QLabel" name="label_9">
+     <property name="font">
+      <font>
+       <underline>true</underline>
+      </font>
+     </property>
+     <property name="text">
+      <string>Start depth</string>
+     </property>
+    </widget>
+   </item>
+   <item row="7" column="1">
+    <widget class="QDoubleSpinBox" name="stepDoubleSpinBox">
+     <property name="suffix">
+      <string> mm</string>
+     </property>
+     <property name="decimals">
+      <number>5</number>
+     </property>
+     <property name="minimum">
+      <double>0.000010000000000</double>
+     </property>
+     <property name="maximum">
+      <double>1000000.000000000000000</double>
+     </property>
+     <property name="value">
+      <double>1.000000000000000</double>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="1">
+    <widget class="QComboBox" name="offsetComboBox">
+     <item>
+      <property name="text">
+       <string>None</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Outset</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Inset</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Custom</string>
+      </property>
+     </item>
+    </widget>
+   </item>
+   <item row="6" column="1">
+    <widget class="QDoubleSpinBox" name="endDepthDoubleSpinBox">
+     <property name="suffix">
+      <string> mm</string>
+     </property>
+     <property name="decimals">
+      <number>5</number>
+     </property>
+     <property name="minimum">
+      <double>-1000000.000000000000000</double>
+     </property>
+     <property name="maximum">
+      <double>1000000.000000000000000</double>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="0">
+    <widget class="QLabel" name="label_6">
+     <property name="font">
+      <font>
+       <underline>true</underline>
+      </font>
+     </property>
+     <property name="text">
+      <string>End depth</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="2">
+    <widget class="QDoubleSpinBox" name="offsetDoubleSpinBox">
+     <property name="suffix">
+      <string> mm</string>
+     </property>
+     <property name="decimals">
+      <number>5</number>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="1">
+    <widget class="QSpinBox" name="feedSpinBox">
+     <property name="suffix">
+      <string> mm/min</string>
+     </property>
+     <property name="maximum">
+      <number>1000000</number>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>accepted()</signal>
+   <receiver>CAMLayerDialog</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>248</x>
+     <y>254</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>157</x>
+     <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>rejected()</signal>
+   <receiver>CAMLayerDialog</receiver>
+   <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>316</x>
+     <y>260</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>286</x>
+     <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>

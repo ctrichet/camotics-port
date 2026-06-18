@@ -1,0 +1,30 @@
+From b2f2556ba2eb22c6446ec886663d12e281cd1167 Mon Sep 17 00:00:00 2001
+From: Joseph Coffland <joseph@cauldrondevelopment.com>
+Date: Fri, 10 Mar 2017 13:05:08 -0800
+Subject: [PATCH] Added missing braces.  Fixes #214
+
+---
+ src/camotics/machine/GCodeMachine.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/camotics/machine/GCodeMachine.cpp b/src/camotics/machine/GCodeMachine.cpp
+index 3d460b2..3ded6b5 100644
+--- a/src/camotics/machine/GCodeMachine.cpp
++++ b/src/camotics/machine/GCodeMachine.cpp
+@@ -115,7 +115,7 @@ void GCodeMachine::setSpeed(double speed, spin_mode_t mode, double max) {
+ 
+   MachineAdapter::setSpeed(speed, mode, max);
+ 
+-  if (oldMode != mode)
++  if (oldMode != mode) {
+     beginLine();
+ 
+     switch (mode) {
+@@ -126,6 +126,7 @@ void GCodeMachine::setSpeed(double speed, spin_mode_t mode, double max) {
+       stream << '\n';
+       break;
+     }
++  }
+ 
+   if (oldSpeed != speed) {
+     beginLine();

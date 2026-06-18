@@ -1,0 +1,14 @@
+build/
+build.log
+*.deb
+*.dsc
+*.tar.xz
+*.buildinfo
+*.changes
+__pycache__/
+*.pyc
+.sconf_temp/
+config.log
+.sconsign.dblite
+.opencode/
+openspec/

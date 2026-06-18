@@ -1,0 +1,7 @@
+camotics (1.3.0-1) unstable; urgency=medium
+
+  * Initial Debian packaging.
+  * Updated to upstream version 1.3.0.
+  * Build-Depends mapped from Fedora .spec reference.
+
+ -- Clement Trichet <clement.trichet.pro@gmail.com>  Thu, 18 Jun 2026 11:00:00 +0200

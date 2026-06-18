@@ -1,0 +1,18 @@
+allow(test, jcoffland)=true
+{
+  "users": [
+    "jcoffland"
+  ],
+  "groups": {
+    "admin": [
+      "jcoffland"
+    ]
+  },
+  "acls": {
+    "test": {
+      "groups": [
+        "admin"
+      ]
+    }
+  }
+}

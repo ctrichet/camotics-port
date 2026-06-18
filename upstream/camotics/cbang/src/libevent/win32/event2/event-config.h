@@ -1,0 +1,45 @@
+#ifndef EVENT_CONFIG_H__
+#define EVENT_CONFIG_H__
+
+#define EVENT__HAVE_FCNTL_H 1
+#define EVENT__HAVE_GETADDRINFO 1
+#define EVENT__HAVE_GETPROTOBYNUMBER 1
+#define EVENT__HAVE_GETSERVBYNAME 1
+#define EVENT__HAVE_STDARG_H 1
+#define EVENT__HAVE_STDDEF_H 1
+#define EVENT__HAVE_STDLIB_H 1
+#define EVENT__HAVE_STRUCT_ADDRINFO 1
+#define EVENT__HAVE_STRUCT_IN6_ADDR 1
+#define EVENT__HAVE_STRUCT_SOCKADDR_IN6 1
+#define EVENT__HAVE_STRUCT_SOCKADDR_STORAGE 1
+#define EVENT__HAVE_SYS_STAT_H 1
+#define EVENT__HAVE_SYS_TYPES_H 1
+#define EVENT__HAVE_SYS_QUEUE_H 1
+#define EVENT__HAVE_TAILQFOREACH 1
+#define EVENT__HAVE_TIMERCLEAR 1
+#define EVENT__HAVE_TIMERISSET 1
+#define EVENT__HAVE_OPENSSL 1
+
+#define EVENT__SIZEOF_INT 4
+#define EVENT__SIZEOF_LONG 4
+#define EVENT__SIZEOF_LONG_LONG 8
+#define EVENT__SIZEOF_SHORT 2
+
+#ifdef _WIN64
+#define EVENT__SIZEOF_SIZE_T 8
+#define EVENT__SIZEOF_VOID_P 8
+#else
+#define EVENT__SIZEOF_SIZE_T 4
+#define EVENT__SIZEOF_VOID_P 4
+#endif
+
+#define EVENT____func__ __FUNCTION__
+
+#ifndef _EVENT___cplusplus
+#define EVENT__inline __inline
+#endif
+
+#define EVENT__socklen_t unsigned int
+#define EVENT__ssize_t SSIZE_T
+
+#endif

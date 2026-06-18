@@ -1,0 +1,30 @@
+From f18d080678c19c32552466e9c73860fc2fd49d49 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Samuel=20Rakitni=C4=8Dan?= <samuel.rakitnican@gmail.com>
+Date: Mon, 21 Jan 2019 12:54:46 +0100
+Subject: [PATCH] Use memcpy() instead of strncpy() and ensure null terminator
+
+backported from upstream 6c11aa6
+---
+ src/camotics/stl/STLWriter.cpp | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/camotics/stl/STLWriter.cpp b/src/camotics/stl/STLWriter.cpp
+index 441fce7..3206d62 100644
+--- a/src/camotics/stl/STLWriter.cpp
++++ b/src/camotics/stl/STLWriter.cpp
+@@ -32,9 +32,9 @@ void STLWriter::writeHeader(const string &name, uint32_t count,
+                             const string &hash) {
+   if (binary) {
+     // Header
+-    char header[80];
+-    memset(header, 0, 80);
+-    if (!hash.empty()) strncpy(header, hash.c_str(), 80);
++    char header[81];
++    memset(header, 0, 81);
++    if (!hash.empty()) memcpy(header, hash.c_str(), 80);
+     stream.write(header, 80);
+ 
+     // Count
+-- 
+2.9.5
+

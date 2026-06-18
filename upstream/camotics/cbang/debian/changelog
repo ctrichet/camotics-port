@@ -1,0 +1,5 @@
+cbang (1.3.3-1) unstable; urgency=low
+
+  * Initial release. (Closes: #949344)
+
+ -- Joseph Coffland <joseph@cauldrondevelopment.com>  Fri, 13 Jan 2012 16:25:58 -0800

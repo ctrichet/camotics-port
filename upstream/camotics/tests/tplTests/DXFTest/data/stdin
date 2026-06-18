@@ -1,0 +1,69 @@
+var dxf = require('dxf')
+
+zSafe = 5;
+zCut = -5;
+feed(50);
+
+
+function samePos(x, y) {
+  var small = 0.0001;
+  return getX() - small < x && x < getX() + small &&
+    getY() - small < y && y < getY() + small;
+}
+
+
+function cut_layer(layer) {
+  for (entity in layer) {
+    entity = layer[entity];
+
+    switch (entity.type) {
+    case dxf.POINT: print('point\n'); break;
+
+    case dxf.LINE:
+      print('(line)\n');
+      if (samePos(entity.end.x, entity.end.y))
+        cut(entity.start.x, entity.start.y);
+
+      else {
+        if (!samePos(entity.start.x, entity.start.y)) {
+          rapid({z: zSafe});
+          rapid(entity.start.x, entity.start.y);
+          cut({z: zCut});
+        }
+
+        cut(entity.end.x, entity.end.y);
+      }
+      break;
+
+    case dxf.ARC: print('(arc)\n'); break;
+
+    case dxf.POLYLINE:
+      if (!entity.vertices.length) break;
+      print('(polyline)\n');
+      v = entity.vertices[0];
+
+      if (!samePos(v.x, v.y)) {
+        rapid({z: zSafe});
+        rapid(v.x, v.y);
+        cut({z: zCut});
+      }
+
+      for (i = 1; i < entity.vertices.length; i++) {
+        v = entity.vertices[i];
+        cut(v.x, v.y);
+      }
+
+      break;
+
+    case dxf.SPLINE: print('(spline)\n'); break;
+    }
+  }
+}
+
+
+layers = dxf.open('pattern.dxf');
+
+for (name in layers) {
+  print('(Layer: ', name, ')\n');
+  cut_layer(layers[name]);
+}

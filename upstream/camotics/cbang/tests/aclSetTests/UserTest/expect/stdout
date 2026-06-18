@@ -1,0 +1,13 @@
+allow(test, jcoffland)=true
+{
+  "users": [
+    "jcoffland"
+  ],
+  "acls": {
+    "test": {
+      "users": [
+        "jcoffland"
+      ]
+    }
+  }
+}
