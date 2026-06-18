@@ -1,4 +1,4 @@
-camotics (1.3.0-1) unstable; urgency=medium
+camotics (1.3.0-1) noble; urgency=medium
 
   * Initial Debian packaging.
   * Updated to upstream version 1.3.0.

@@ -1,7 +1,0 @@
-{
-  "checks": [
-    ["file", "stdout", ["replace", "\\d+", "NUM"]],
-    ["file", "stderr"],
-    ["file", "return"]
-  ]
-}

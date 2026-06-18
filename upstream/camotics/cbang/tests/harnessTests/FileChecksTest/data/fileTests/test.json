@@ -1,3 +1,0 @@
-{
-  "command": ["sh", "-c", "printf 0123456789 > out.txt"]
-}

@@ -1,3 +1,0 @@
-{
-  "command": ["test", "-d", "%(suite-dir)s"]
-}

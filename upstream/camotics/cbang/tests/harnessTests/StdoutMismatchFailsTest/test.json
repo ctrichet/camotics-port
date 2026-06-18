@@ -1,4 +1,0 @@
-{
-  "args": ["run", "echoTests/MismatchTest"],
-  "checks": [["file", "return"]]
-}

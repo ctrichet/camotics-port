@@ -10,5 +10,6 @@ __pycache__/
 .sconf_temp/
 config.log
 .sconsign.dblite
+upstream/
 .opencode/
 openspec/

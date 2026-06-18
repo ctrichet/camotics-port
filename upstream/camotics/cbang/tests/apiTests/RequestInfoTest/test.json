@@ -1,3 +1,0 @@
-{
-  "args": ["GET", "/request-info", "Host: example.com:8080"]
-}

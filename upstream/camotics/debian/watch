@@ -1,4 +1,0 @@
-version=4
-
-https://github.com/CauldronDevelopmentLLC/CAMotics/tags \
-(?:.*?/)?v?(\d[\d.]*)@ARCHIVE_EXT@

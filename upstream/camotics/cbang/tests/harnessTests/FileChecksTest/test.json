@@ -1,4 +1,0 @@
-{
-  "args": ["run", "fileTests/SizeTest"],
-  "checks": [["file", "return"]]
-}

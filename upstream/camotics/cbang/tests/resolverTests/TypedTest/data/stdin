@@ -1,1 +1,0 @@
-{"context": {"args": {"size": 800, "on": true, "name": "Bob", "obj": {"w": 1, "h": 2}, "list": [1, 2, 3]}}, "template": {"num": "{args.size}", "bool": "{args.on}", "str": "{args.name}", "obj": "{args.obj}", "list": "{args.list}", "embedded": "px-{args.size}", "nullref": "{~args.nope}", "fmt": "{args.size:s}"}}

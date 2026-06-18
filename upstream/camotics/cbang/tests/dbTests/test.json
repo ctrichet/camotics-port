@@ -1,8 +1,0 @@
-{
-  "command": "%(suite-dir)s/dbQuery %(suite-dir)s/fixture.yaml",
-  "checks": [
-    ["file", "stdout"],
-    ["file", "stderr", ["not_match", ".*WARNING"]],
-    ["file", "return"]
-  ]
-}

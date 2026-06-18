@@ -1,4 +1,0 @@
-{
-  "command": "%(suite-dir)s/sha256",
-  "args": ["Hello World!"]
-}

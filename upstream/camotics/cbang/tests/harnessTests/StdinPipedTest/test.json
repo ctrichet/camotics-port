@@ -1,4 +1,0 @@
-{
-  "args": ["run", "catTests/StdinTest"],
-  "checks": [["file", "return"]]
-}

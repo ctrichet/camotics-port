@@ -1,6 +1,0 @@
-{
-  "command": "%(suite-dir)s/compress test.txt test.bz2",
-  "checks": ["standard",
-             ["min_size", "test.bz2", 40],
-             ["max_size", "test.bz2", 80]]
-}

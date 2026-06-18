@@ -1,8 +1,0 @@
-{
-  "args": [
-    "PUT",
-    "/body-bad",
-    "Content-Type: application/octet-stream",
-    "-stdin"
-  ]
-}

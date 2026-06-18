@@ -1,4 +1,0 @@
-{
-  "args": ["run", "sleepTests/TimedOutTest"],
-  "checks": [["file", "return"]]
-}
