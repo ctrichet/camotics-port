@@ -15,6 +15,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Clone upstream source
+        run: |
+          mkdir -p upstream
+          git clone --depth 1 https://github.com/CauldronDevelopmentLLC/CAMotics.git upstream/camotics
+          rm -rf upstream/camotics/.git
+
       - name: Install dependencies
         run: |
           sudo apt-get update -qq
