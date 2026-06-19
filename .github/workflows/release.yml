@@ -1,24 +1,35 @@
 name: Build and Release
 
+permissions:
+  contents: write
+
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Clone upstream source
+        run: |
+          mkdir -p upstream
+          git clone --depth 1 https://github.com/CauldronDevelopmentLLC/CAMotics.git upstream/camotics
+          git clone --depth 1 https://github.com/CauldronDevelopmentLLC/cbang.git upstream/camotics/cbang
+          rm -rf upstream/camotics/.git upstream/camotics/cbang/.git
+
       - name: Install dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
-            scons debhelper \
+            scons build-essential debhelper desktop-file-utils \
             qtbase5-dev libqt5websockets5-dev \
             libglew-dev libcairo2-dev libdxflib-dev \
             libre2-dev libbz2-dev libsqlite3-dev \
