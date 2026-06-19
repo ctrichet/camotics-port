@@ -19,7 +19,8 @@ jobs:
         run: |
           mkdir -p upstream
           git clone --depth 1 https://github.com/CauldronDevelopmentLLC/CAMotics.git upstream/camotics
-          rm -rf upstream/camotics/.git
+          git clone --depth 1 https://github.com/CauldronDevelopmentLLC/cbang.git upstream/camotics/cbang
+          rm -rf upstream/camotics/.git upstream/camotics/cbang/.git
 
       - name: Install dependencies
         run: |
