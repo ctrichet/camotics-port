@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-noble:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,26 +29,77 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
-            scons build-essential debhelper desktop-file-utils \
+            scons python3-six build-essential debhelper desktop-file-utils \
             qtbase5-dev libqt5websockets5-dev \
             libglew-dev libcairo2-dev libdxflib-dev \
             libre2-dev libbz2-dev libsqlite3-dev \
             pkgconf libappstream-glib-dev lintian \
             libnode-dev
 
-      - name: Build Debian package
-        run: ./scripts/build.sh
+      - name: Build Debian package (Noble)
+        run: ./scripts/build.sh --distro noble
 
-      - name: Upload .deb artifact
+      - name: Upload .deb artifact (Noble)
         uses: actions/upload-artifact@v4
         with:
-          name: camotics-deb
+          name: camotics-deb-noble
           path: build/*.deb
           if-no-files-found: error
+
+  build-bookworm:
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clone upstream source
+        run: |
+          mkdir -p upstream
+          git clone --depth 1 https://github.com/CauldronDevelopmentLLC/CAMotics.git upstream/camotics
+          git clone --depth 1 https://github.com/CauldronDevelopmentLLC/cbang.git upstream/camotics/cbang
+          rm -rf upstream/camotics/.git upstream/camotics/cbang/.git
+
+      - name: Install dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq \
+            scons python3-six build-essential debhelper desktop-file-utils \
+            qtbase5-dev libqt5websockets5-dev \
+            libglew-dev libcairo2-dev libdxflib-dev \
+            libre2-dev libbz2-dev libsqlite3-dev \
+            pkgconf libappstream-glib-dev lintian \
+            libnode-dev
+
+      - name: Build Debian package (Bookworm)
+        run: ./scripts/build.sh --distro bookworm
+
+      - name: Upload .deb artifact (Bookworm)
+        uses: actions/upload-artifact@v4
+        with:
+          name: camotics-deb-bookworm
+          path: build/*.deb
+          if-no-files-found: error
+
+  release:
+    needs: [build-noble, build-bookworm]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: List artifacts
+        run: ls -la camotics-deb-*/ 2>/dev/null || ls -la
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: build/*.deb
+          files: camotics-deb-*/*
           body_path: debian/changelog
           generate_release_notes: false
