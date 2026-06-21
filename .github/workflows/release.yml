@@ -55,6 +55,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install git
+        run: apt-get update -qq && apt-get install -y -qq git
+
       - name: Clone upstream source
         run: |
           mkdir -p upstream
