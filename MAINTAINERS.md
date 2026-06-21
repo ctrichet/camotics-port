@@ -11,6 +11,15 @@
 | Fedora patches | Extracted from Fedora SRPM | Adapted for Debian build system |
 | C! library (cbang) | [CauldronDevelopmentLLC/cbang](https://github.com/CauldronDevelopmentLLC/cbang) | Bundled in upstream source tree |
 
+## Supported distributions
+
+- **Ubuntu 24.04 (Noble Numbat)** — primary target
+- **Debian 12 (Bookworm)** — additional port, uses the same packaging files
+
+Both distributions share `debian/control`, `debian/rules`, and all patches.
+A multi-distro changelog (`debian/changelog`) selects the target distribution.
+Build with `./scripts/build.sh --distro bookworm` for Debian.
+
 ## Build notes
 
 - Build system: **SCons** (not CMake)

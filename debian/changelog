@@ -5,3 +5,10 @@ camotics (1.3.0-1) noble; urgency=medium
   * Build-Depends mapped from Fedora .spec reference.
 
  -- Clement Trichet <clement.trichet.pro@gmail.com>  Thu, 18 Jun 2026 11:00:00 +0200
+
+camotics (1.3.0-1) bookworm; urgency=medium
+
+  * Debian Bookworm port.
+  * Same source as Noble build; packaging files are identical.
+
+ -- Clement Trichet <clement.trichet.pro@gmail.com>  Thu, 18 Jun 2026 11:00:00 +0200

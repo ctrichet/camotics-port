@@ -1,22 +1,29 @@
-# CAMotics Debian Packaging for Ubuntu
+# CAMotics Debian Packaging for Ubuntu & Debian
 
-**Target distribution: Ubuntu 24.04 (Noble Numbat)**
+**Target distributions: Ubuntu 24.04 (Noble Numbat) and Debian 12 (Bookworm)**
 
 Debian packaging for [CAMotics](https://camotics.org/) v1.3.0 — an
 open-source 3-axis CNC machining simulation software. This repository
-produces a `.deb` package for easy installation on Ubuntu.
-
-> **Note**: This package is built and tested on Ubuntu 24.04 only.
-> It may not work on Debian or older Ubuntu releases due to library
-> version differences.
+produces a `.deb` package for easy installation on Ubuntu and Debian.
 
 ## Build from source
+
+### Ubuntu Noble
 
 ```bash
 sudo apt install scons debhelper qtbase5-dev libglew-dev libcairo2-dev \
   libdxflib-dev libre2-dev libbz2-dev libsqlite3-dev \
   libqt5websockets5-dev pkgconf libappstream-glib-dev
-./scripts/build.sh
+./scripts/build.sh --distro noble
+```
+
+### Debian Bookworm
+
+```bash
+sudo apt install scons debhelper qtbase5-dev libglew-dev libcairo2-dev \
+  libdxflib-dev libre2-dev libbz2-dev libsqlite3-dev \
+  libqt5websockets5-dev pkgconf libappstream-glib-dev
+./scripts/build.sh --distro bookworm
 ```
 
 The `.deb` will be in the `build/` directory.
@@ -24,7 +31,8 @@ The `.deb` will be in the `build/` directory.
 ## Install
 
 ```bash
-sudo dpkg -i build/camotics_1.3.0-1_amd64.deb
+# The .deb filename varies by version and distribution; check build/ for the exact name.
+sudo dpkg -i build/camotics_*.deb
 ```
 
 ## Usage

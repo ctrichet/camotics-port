@@ -6,6 +6,7 @@ Standards-Version: 4.7.0
 Homepage: https://camotics.org/
 Build-Depends: debhelper-compat (= 13),
                scons,
+               python3-six,
                g++,
                pkgconf,
                libbz2-dev,
