@@ -50,4 +50,4 @@ dpkg-buildpackage -us -uc -b 2>&1 | tee "$PROJECT_ROOT/build.log"
 
 echo "=== Build successful! ==="
 echo "Packages:"
-ls -la "$BUILD_DIR"/*.deb "$BUILD_DIR"/*.dsc 2>/dev/null
+ls -la "$BUILD_DIR"/*.deb 2>/dev/null || true
