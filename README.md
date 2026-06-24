@@ -17,7 +17,7 @@ sudo apt install scons debhelper qtbase5-dev libglew-dev libcairo2-dev \
 ./scripts/build.sh --distro noble
 ```
 
-### Debian Bookworm
+### Debian Trixie
 
 ```bash
 sudo apt install scons debhelper qtbase5-dev libglew-dev libcairo2-dev \
