@@ -1,6 +1,6 @@
 # CAMotics Debian Packaging for Ubuntu & Debian
 
-**Target distributions: Ubuntu 24.04 (Noble Numbat) and Debian 12 (Bookworm)**
+**Target distributions: Ubuntu 24.04 (Noble Numbat), Ubuntu 26.04 (Resolute Racoon), and Debian 12 (Bookworm)**
 
 Debian packaging for [CAMotics](https://camotics.org/) v1.3.0 — an
 open-source 3-axis CNC machining simulation software. This repository
@@ -15,6 +15,15 @@ sudo apt install scons debhelper qtbase5-dev libglew-dev libcairo2-dev \
   libdxflib-dev libre2-dev libbz2-dev libsqlite3-dev \
   libqt5websockets5-dev pkgconf libappstream-glib-dev
 ./scripts/build.sh --distro noble
+```
+
+### Ubuntu Resolute
+
+```bash
+sudo apt install scons debhelper qtbase5-dev libglew-dev libcairo2-dev \
+  libdxflib-dev libre2-dev libbz2-dev libsqlite3-dev \
+  libqt5websockets5-dev pkgconf libappstream-glib-dev
+./scripts/build.sh --distro resolute
 ```
 
 ### Debian Trixie

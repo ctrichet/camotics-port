@@ -33,7 +33,7 @@ Derived from `camotics.spec` (Fedora 1.1.1-15) and upstream CAMotics source.
 | `dxflib` | `libdxflib3` | runtime-dep | |
 | `sqlite` | `libsqlite3-0` | runtime-dep | |
 | `openssl` | `libssl3t64` | runtime-dep | |
-| `nodejs` | `libnode109` | runtime-dep | Provides V8 runtime |
+| `nodejs` | `libnode109` (Noble), `libnode127` (Resolute) | runtime-dep | Provides V8 runtime |
 
 ## Bundled Libraries (not packaged separately)
 
@@ -46,6 +46,7 @@ Derived from `camotics.spec` (Fedora 1.1.1-15) and upstream CAMotics source.
 ## Notes
 
 - `v8-314-devel` excludes `aarch64 ppc64le s390x` on Fedora. In Debian, V8 3.14 is not available. System V8 from `libnode-dev` works but requires `v8_compress_pointers=0` in SCons.
+- Ubuntu 26.04 (Resolute) ships Node.js 22 (`libnode127`) and RE2 20250805 (`libre2-10`), compared to Node.js 20 (`libnode109`) and RE2 20240501 (`libre2-9`) on Ubuntu 24.04 (Noble). Runtime dependencies use `shlibs:Depends` and are resolved automatically by dpkg-shlibdeps.
 - `lrelease` binary is needed by the Qt5 SCons tool. Install `qttools5-dev-tools`, or use the QT5DIR wrapper workaround in `debian/rules` (symlinks real Qt5 tools + stub lrelease).
 - Build uses **SCons**, not CMake (despite some packaging tools defaulting to CMake).
 - `cbang` requires extra SCons configuration and is expected to be in `CBANG_HOME` (found in `upstream/camotics/cbang/`).
