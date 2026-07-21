@@ -13,8 +13,8 @@ while [ "$#" -gt 0 ]; do
       DISTRO="$2"
       shift 2
       ;;
-    *)
-      echo "Usage: $0 [--distro noble|bookworm]"
+      *)
+      echo "Usage: $0 [--distro noble|bookworm|resolute]"
       echo "  --distro  Target distribution (default: noble)"
       exit 1
       ;;
@@ -34,15 +34,15 @@ cp -a "$UPSTREAM_DIR" "$BUILD_DIR/camotics"
 rm -rf "$BUILD_DIR/camotics/debian"
 cp -a "$PROJECT_ROOT/debian" "$BUILD_DIR/camotics/debian"
 
-# For non-default distro, adjust changelog so the target entry is at top
-if [ "$DISTRO" = "bookworm" ]; then
-  cd "$BUILD_DIR/camotics"
-  # Remove the noble changelog entry from the build copy so bookworm becomes top
-  # This only affects the build copy, not the original debian/changelog
-  sed -i '/^camotics (1\.3\.0-1) noble;/,/^ --.*$/d' debian/changelog
-  # Remove leading blank line left after noble entry removal
-  sed -i '1{/^$/d}' debian/changelog
-fi
+# Adjust changelog so only the target distro entry remains at top
+# This only affects the build copy, not the original debian/changelog
+cd "$BUILD_DIR/camotics"
+for d in $(sed -n 's/^camotics (1\.[0-9.]\+-[0-9]\+) \([^;]*\);.*/\1/p' debian/changelog); do
+  if [ "$d" != "$DISTRO" ]; then
+    sed -i "/^camotics (1\.[0-9.]\+-[0-9]\+) $d;/,/^ --.*$/d" debian/changelog
+  fi
+done
+sed -i '1{/^$/d}' debian/changelog
 
 # Build
 cd "$BUILD_DIR/camotics"

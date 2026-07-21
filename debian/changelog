@@ -1,12 +1,18 @@
-camotics (1.3.0-1) noble; urgency=medium
+camotics (1.3.0-2) resolute; urgency=medium
 
-  * Initial Debian packaging.
-  * Updated to upstream version 1.3.0.
-  * Build-Depends mapped from Fedora .spec reference.
+  * Ubuntu 26.04 LTS (Resolute Racoon) port.
+  * Same source as Noble build; packaging files are identical.
 
- -- Clement Trichet <clement.trichet.pro@gmail.com>  Thu, 18 Jun 2026 11:00:00 +0200
+ -- Clement Trichet <clement.trichet.pro@gmail.com>  Tue, 21 Jul 2026 18:00:00 +0200
 
-camotics (1.3.0-1) bookworm; urgency=medium
+camotics (1.3.0-2) noble; urgency=medium
+
+  * Rebuild for Resolute-era runner.
+  * No source changes.
+
+ -- Clement Trichet <clement.trichet.pro@gmail.com>  Tue, 21 Jul 2026 18:00:00 +0200
+
+camotics (1.3.0-2) bookworm; urgency=medium
 
   * Debian Bookworm port.
   * Same source as Noble build; packaging files are identical.
